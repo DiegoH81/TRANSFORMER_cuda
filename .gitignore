@@ -1,11 +1,13 @@
-*
-*/
-!**/
+/*
+!*/
 !*.cu
 !*.cuh
 !*.cpp
 !*.h
-
 !.gitignore
 !README.md
 !LICENSE
+
+*.vcxproj.user
+*.vcxproj
+x64/

@@ -1,6 +1,11 @@
-*.i
-*.ii
-*.gpu
-*.ptx
-*.cubin
-*.fatbin
+*
+*/
+!**/
+!*.cu
+!*.cuh
+!*.cpp
+!*.h
+
+!.gitignore
+!README.md
+!LICENSE

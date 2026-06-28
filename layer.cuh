@@ -130,7 +130,7 @@ public:
         weights.set_random(0.1f);
         bias.set_random(0.1f);
 
-        output.set_size(output_size);
+        output.set_size(output_size * batch_size);
     }
 
     void forward()

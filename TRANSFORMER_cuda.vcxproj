@@ -15,10 +15,15 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="activation_function.cuh" />
+    <ClInclude Include="CLS_token.cuh" />
     <ClInclude Include="data_loader.cuh" />
     <ClInclude Include="layer.cuh" />
     <ClInclude Include="MLP.cuh" />
+    <ClInclude Include="PatchEmbedding.cuh" />
+    <ClInclude Include="PositionalEncoding.cuh" />
     <ClInclude Include="tensor.cuh" />
+    <ClInclude Include="Transformer.cuh" />
+    <ClInclude Include="utils.cuh" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{ACBE70E6-5BB2-888A-9114-ECD2E8ED4AD2}</ProjectGuid>

@@ -14,13 +14,9 @@ public:
     float* data, * gradient;
     size_t size;
 
-    Tensor() :
-        data(nullptr), gradient(nullptr), size(0)
-    {
-    }
+    Tensor() : data(nullptr), gradient(nullptr), size(0){}
 
-    Tensor(const Tensor& other) : size(other.size)
-    {
+    Tensor(const Tensor& other) : size(other.size){
         init_array();
         cudaMemcpy(data, other.data, size * sizeof(float), cudaMemcpyDefault);
         cudaMemcpy(gradient, other.gradient, size * sizeof(float), cudaMemcpyDefault);
@@ -86,12 +82,13 @@ public:
         reset_array(gradient);
     }
 
-    void print()
+    void print(int max = -1)
     {
         auto CPU_vector = get_data_CPU();
         std::cout << "T { ";
 
-        size_t vec_size = CPU_vector.size();
+
+        size_t vec_size = max == -1 ? CPU_vector.size() : max;
         for (size_t i = 0; i < vec_size; i++)
         {
             std::cout << CPU_vector[i];
@@ -101,6 +98,34 @@ public:
         }
 
         std::cout << " }\n";
+    }
+
+    void print_tokens(int sequence_len, int dim_model,
+        int image = 0, int max_tokens = -1)
+    {
+        auto cpu = get_data_CPU();
+
+        if (max_tokens == -1)
+            max_tokens = sequence_len;
+
+        int token_count = std::min(sequence_len, max_tokens);
+
+        std::cout << "Tensor (" << sequence_len
+            << " tokens, dim=" << dim_model << ")\n";
+
+        for (int t = 0; t < token_count; t++)
+        {
+            std::cout << "Token " << t << ": ";
+
+            int base = (image * sequence_len + t) * dim_model;
+
+            for (int d = 0; d < dim_model; d++)
+                std::cout << cpu[base + d] << " ";
+
+            std::cout << '\n';
+        }
+
+        std::cout << '\n';
     }
 
     void zero_grad()

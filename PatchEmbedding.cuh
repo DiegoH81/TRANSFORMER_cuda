@@ -48,16 +48,11 @@ public:
 
     int n_images, num_patches, patch_size, dim_model;
 
-    PatchEmbedding(Data& in_data):
+    PatchEmbedding(int in_n_images):
         images_tensor(), patches_tensor(), projection(nullptr),
         num_patches(16), patch_size(49)
     {
-        n_images = in_data.n_samples;
-
-        std::vector<float>  images_data, expected_data;
-        in_data.get_all(images_data, expected_data);
-
-        images_tensor.load(images_data);
+        n_images = in_n_images;
 
         patches_tensor.set_size(n_images * num_patches * patch_size);
 
@@ -67,6 +62,11 @@ public:
         projection = new Layer(patch_size, dim_model, n_images * num_patches, ActivationType::None, &patches_tensor);
     }
     
+    void set_batch(std::vector<float>& batch_images)
+    {
+        images_tensor.load(batch_images);
+    }
+
     void forward()
     {
         dim3 grid(n_images, 16);

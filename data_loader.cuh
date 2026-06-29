@@ -116,6 +116,39 @@ public:
         }
     }
 
+    void get_batch(int start_index, int batch_size, std::vector<float>& out_data, std::vector<float>& out_expected)
+    {
+        int count = std::min(batch_size, n_samples - start_index);
+
+        out_data.clear();
+        out_expected.clear();
+        out_data.reserve(count * image_size);
+        out_expected.reserve(count * 10);
+
+        for (int i = 0; i < count; i++)
+        {
+            // Label one-hot
+            std::vector<float> to_push(10, 0);
+            to_push[expected_output[start_index + i]] = 1;
+            out_expected.insert(out_expected.end(), to_push.begin(), to_push.end());
+
+            // Imagen
+            int start_idx = (start_index + i) * image_size;
+            for (int j = 0; j < image_size; j++)
+                out_data.push_back((float)images[start_idx + j]);
+        }
+    }
+
+    std::vector<int> get_batch_labels_int(int start_index, int batch_size)
+    {
+        int count = std::min(batch_size, n_samples - start_index);
+        std::vector<int> labels(count);
+        for (int i = 0; i < count; i++)
+            labels[i] = expected_output[start_index + i];
+        return labels;
+    }
+
+
 private:
     uint32_t readBE32(std::ifstream& file)
     {

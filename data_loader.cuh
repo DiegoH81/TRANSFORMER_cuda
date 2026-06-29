@@ -139,6 +139,15 @@ public:
         }
     }
 
+    std::vector<int> get_batch_labels_int(int start_index, int batch_size)
+    {
+        int count = std::min(batch_size, n_samples - start_index);
+        std::vector<int> labels(count);
+        for (int i = 0; i < count; i++)
+            labels[i] = expected_output[start_index + i];
+        return labels;
+    }
+
 
 private:
     uint32_t readBE32(std::ifstream& file)

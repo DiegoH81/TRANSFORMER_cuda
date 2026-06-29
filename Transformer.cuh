@@ -9,16 +9,28 @@
 #include "PatchEmbedding.cuh"
 
 #include "EncoderBlock.cuh"
+#include "ClassificationHead.cuh"
 
 
 
 class Transformer
 {
 public:
+    float learning_rate;
+
+    PatchEmbedding patch_embedding;
+    CLSToken CLS;
+    PositionalEncoding position_encoding;
+    ClassificationHead class_head;
+
+    std::vector<EncoderBlock> encoders;
+
+
     Transformer(int in_batch_size, float in_learning_rate, int n_encoder_blocks = 2):
         patch_embedding(in_batch_size),
         CLS(patch_embedding.dim_model, patch_embedding.num_patches, patch_embedding.n_images),
         position_encoding(CLS.num_patches + 1, CLS.dim_model, CLS.n_images),
+        class_head(in_batch_size, position_encoding.dim_model, 10),
         learning_rate(in_learning_rate)
     {
         for (int i = 0; i < n_encoder_blocks; i++)
@@ -31,23 +43,23 @@ public:
     {
         patch_embedding.forward();
 
-        std::cout << "\n===== PATCH EMBEDDING =====\n";
-        patch_embedding.patches_tensor.print(500);
+        //std::cout << "\n===== PATCH EMBEDDING =====\n";
+        //patch_embedding.patches_tensor.print(500);
 
 
         CLS.previous = &patch_embedding.projection->output;
         CLS.forward();
 
-        std::cout << "\n===== CLS =====\n";
-        CLS.output.print(5);
+        //std::cout << "\n===== CLS =====\n";
+        //CLS.output.print(5);
 
         position_encoding.previous = &CLS.output;
         position_encoding.forward();
 
-        std::cout << "\n===== POSITION ENCODING =====\n";
-        CLS.output.print(5);
+        //std::cout << "\n===== POSITION ENCODING =====\n";
+        //CLS.output.print(5);
 
-        std::cout << "\n===== ENCODER =====\n";
+        //std::cout << "\n===== ENCODER =====\n";
         encoders[0].previous = position_encoding.previous;
         for (int i = 1; i < encoders.size(); i++)
             encoders[i].previous = &encoders[i - 1].output;
@@ -55,7 +67,11 @@ public:
         for (auto& enc : encoders)
             enc.forward();
 
-        return encoders.back().output;
+        //std::cout << "\n===== CLASSIFICATION HEAD =====\n";
+        class_head.previous = &encoders.back().output;
+        class_head.forward(position_encoding.sequence_len);
+
+        return class_head.output;
     }
 
     void set_batch(std::vector<float>& batch_images)
@@ -71,10 +87,14 @@ public:
 
         for (auto& enc : encoders)
             enc.zero_grad();
+
+        class_head.zero_grad();
     }
 
-    void backward()
+    void backward(Tensor& expected)
     {
+        class_head.backward(expected, learning_rate, position_encoding.sequence_len);
+
         for (int i = encoders.size() - 1; i >= 0; i--)
             encoders[i].backward(learning_rate);
 
@@ -88,14 +108,6 @@ public:
 
 
     }
-private:
-    float learning_rate;
-
-    PatchEmbedding patch_embedding;
-    CLSToken CLS;
-    PositionalEncoding position_encoding;
-
-    std::vector<EncoderBlock> encoders;
 };
 
 #endif

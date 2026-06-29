@@ -75,25 +75,75 @@ int main()
 
     int batch_size = 128;
 
-    Transformer testin(batch_size, 0.1f);
+    Transformer testin(batch_size, 0.0001f);
 
-    //for (int i = 0; i < train_data.n_samples; i += batch_size)
+    float total_loss = 0.0f;
+    int total_correct = 0;
+    int max_epochs = 20;
+
+    for (int epoch = 1; epoch <= max_epochs; epoch++)
     {
-        std::vector<float> batch_images, batch_labels;
-        train_data.get_batch(0, batch_size, batch_images, batch_labels);
+        total_correct = 0;
 
-        testin.set_batch(batch_images);
+        std::cout << "EPOCH " << epoch << "/" << max_epochs << "\n";
 
-        auto output = testin.forward();
-        testin.backward();
-        testin.zero_grad();
-        
-        //data.print();
-        auto cpu_data = output.get_data_CPU();
-        std::cout << "DATA  SIZE: " << cpu_data.size() << "\n";
+        for (int i = 0; i < train_data.n_samples; i += batch_size)
+        {
+            std::vector<float> batch_images, batch_labels;
+            std::vector<int> batch_labels_int;
+
+
+            batch_labels_int = train_data.get_batch_labels_int(i, batch_size);
+            train_data.get_batch(i, batch_size, batch_images, batch_labels);
+
+            testin.set_batch(batch_images);
+
+            auto output = testin.forward();
+
+            Tensor expected(batch_labels);
+            testin.backward(expected);
+            testin.zero_grad();
+
+            // Accuracy testing
+            auto preds = testin.class_head.predictions();
+            for (int j = 0; j < batch_labels_int.size(); j++)
+                if (preds[j] == batch_labels_int[j])
+                    total_correct++;
+
+            // Print cada 100 batches
+            if ((i / batch_size) % 100 == 0)
+            {
+                float partial_acc = (float)total_correct / (i + batch_size) * 100.0f;
+                std::cout << "  batch " << i / batch_size << "/" << train_data.n_samples / batch_size << "  acc parcial: " << partial_acc << "%\n";
+            }
+        }
     }
 
-    
+    float train_acc = (float)total_correct / train_data.n_samples * 100.0f;
+    std::cout << " - Train acc: " << train_acc << "%\n";
+
+
+    std::cout << "\nEVALUATION\n";
+    int eval_correct = 0;
+    for (int i = 0; i < evaluation_data.n_samples; i += batch_size)
+    {
+        std::vector<float> batch_images, batch_labels_onehot;
+        std::vector<int> batch_labels_int;
+        evaluation_data.get_batch(i, batch_size, batch_images, batch_labels_onehot);
+        batch_labels_int = evaluation_data.get_batch_labels_int(i, batch_size);
+
+        testin.set_batch(batch_images);
+        testin.forward();
+
+        auto preds = testin.class_head.predictions();
+        for (int j = 0; j < batch_labels_int.size(); j++)
+            if (preds[j] == batch_labels_int[j])
+                eval_correct++;
+    }
+
+    float eval_acc = (float)eval_correct / evaluation_data.n_samples * 100.0f;
+    std::cout << " - Eval acc: " << eval_acc << "%\n";
+
 
     //test_layernorm();
     return 0;

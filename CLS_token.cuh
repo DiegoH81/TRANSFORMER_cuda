@@ -74,7 +74,9 @@ public:
     void update_weights(float in_learning_rate)
     {
         int threads = dim_model;
-        sgd_update << <1, threads >> > ( cls.data, cls.gradient, in_learning_rate, dim_model );
+        float effective_lr = in_learning_rate / (float)n_images;
+
+        sgd_update << <1, threads >> > ( cls.data, cls.gradient, effective_lr, dim_model );
         cudaDeviceSynchronize();
     }
 

@@ -429,16 +429,19 @@ public:
 		int threads = 256;
 		int blocks = (W_size + threads - 1) / threads;
 
-		sgd_update << <blocks, threads >> > (Wq.data, Wq.gradient, lr, W_size);
-		sgd_update << <blocks, threads >> > (Wk.data, Wk.gradient, lr, W_size);
-		sgd_update << <blocks, threads >> > (Wv.data, Wv.gradient, lr, W_size);
-		sgd_update << <blocks, threads >> > (Wo.data, Wo.gradient, lr, W_size);
+		float effective_lr = lr / (float)(n_images * seq_len);
+
+		sgd_update << <blocks, threads >> > (Wq.data, Wq.gradient, effective_lr, W_size);
+		sgd_update << <blocks, threads >> > (Wk.data, Wk.gradient, effective_lr, W_size);
+		sgd_update << <blocks, threads >> > (Wv.data, Wv.gradient, effective_lr, W_size);
+		sgd_update << <blocks, threads >> > (Wo.data, Wo.gradient, effective_lr, W_size);
 
 		int b_blocks = (dim_model + threads - 1) / threads;
-		sgd_update << <b_blocks, threads >> > (bq.data, bq.gradient, lr, dim_model);
-		sgd_update << <b_blocks, threads >> > (bk.data, bk.gradient, lr, dim_model);
-		sgd_update << <b_blocks, threads >> > (bv.data, bv.gradient, lr, dim_model);
-		sgd_update << <b_blocks, threads >> > (bo.data, bo.gradient, lr, dim_model);
+		float effective_lr_b = lr / (float)(n_images * seq_len);
+		sgd_update << <b_blocks, threads >> > (bq.data, bq.gradient, effective_lr_b, dim_model);
+		sgd_update << <b_blocks, threads >> > (bk.data, bk.gradient, effective_lr_b, dim_model);
+		sgd_update << <b_blocks, threads >> > (bv.data, bv.gradient, effective_lr_b, dim_model);
+		sgd_update << <b_blocks, threads >> > (bo.data, bo.gradient, effective_lr_b, dim_model);
 		cudaDeviceSynchronize();
 	}
 

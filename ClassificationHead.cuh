@@ -26,7 +26,8 @@ void extract_cls_backward(float* d_cls, float* d_encoder_out, int seq_len, int d
     if (img >= n_images || d >= dim_model)
         return;
 
-    d_encoder_out[img * seq_len * dim_model + d] = d_cls[img * dim_model + d];
+    //d_encoder_out[img * seq_len * dim_model + d] = d_cls[img * dim_model + d];
+    atomicAdd(&d_encoder_out[img * seq_len * dim_model + d], d_cls[img * dim_model + d]);
 }
 
 __global__
@@ -102,6 +103,7 @@ public:
      
         dim3 grid(n_images);
         int  threads = dim_model;
+
         extract_cls_backward << <grid, threads >> > (cls_tokens.gradient, previous->gradient, seq_len, dim_model, n_images);
         cudaDeviceSynchronize();
     }

@@ -91,6 +91,7 @@ __global__ void layer_norm_backward(float* d_out, float* x_hat, float* inv_std, 
 	float grad = is * (1.0f / dim_model) * gamma[tid] * (dim_model * dout - sum_dout - xh * sum_dout_xhat);
 
 	d_input[token_offset + tid] = grad;
+    //atomicAdd(&d_input[token_offset + tid], grad);
 }
 
 class LayerNorm {
@@ -140,8 +141,11 @@ public:
 	void update_weights(float updt) {
 		int threads = 256;
 		int blocks = (dim_model + threads - 1) / threads;
-		sgd_update << <blocks, threads >> > (gamma.data, gamma.gradient, updt, dim_model);
-		sgd_update << <blocks, threads >> > (beta.data, beta.gradient, updt, dim_model);
+
+		float effective_lr = updt / (float)(n_images * sequence_len);
+
+		sgd_update << <blocks, threads >> > (gamma.data, gamma.gradient, effective_lr, dim_model);
+		sgd_update << <blocks, threads >> > (beta.data, beta.gradient, effective_lr, dim_model);
 		cudaDeviceSynchronize();
 	}
 	void zero_grad() {

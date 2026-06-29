@@ -75,11 +75,11 @@ int main()
 
     int batch_size = 128;
 
-    Transformer testin(batch_size, 0.0001f);
+    Transformer testin(batch_size, 0.001f);
 
     float total_loss = 0.0f;
     int total_correct = 0;
-    int max_epochs = 20;
+    int max_epochs = 15;
 
     for (int epoch = 1; epoch <= max_epochs; epoch++)
     {

@@ -72,7 +72,10 @@ public:
         int total = sequence_len * dim_model;
         int threads = 256;
         int blocks = (total + threads - 1) / threads;
-        sgd_update << <blocks, threads >> > ( pos_emb.data, pos_emb.gradient, in_learning_rate, total );
+
+        float effective_lr = in_learning_rate / (float)n_images;
+
+        sgd_update << <blocks, threads >> > ( pos_emb.data, pos_emb.gradient, effective_lr, total );
         cudaDeviceSynchronize();
     }
 

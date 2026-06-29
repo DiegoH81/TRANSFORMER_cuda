@@ -19,8 +19,23 @@ void layer_forward(float* weights, float* bias, float* input, float* output,
 
     float sum = bias[output_idx];
 
-    for (size_t i = 0; i < input_size; i++)
+
+    if (batch_idx == 0 && output_idx == 0)
+    {
+        //printf("bias = %f\n", bias[0]);
+    }
+    for (size_t i = 0; i < input_size; i++) {
+        if (batch_idx == 0 && output_idx == 0 && i < 5)
+        {
+            //printf("input[%d] = %f\n", i, input[i]);
+            //printf("weight[%d] = %f\n", i, weights[i]);
+        }
         sum += weights[output_idx * input_size + i] * input[(batch_idx * input_size) + i];
+    }
+    if (batch_idx == 0 && output_idx == 0)
+    {
+        //printf("sum = %f\n", sum);
+    }
 
     output[(batch_idx * output_size) + output_idx] = sum;
 }
@@ -127,20 +142,30 @@ public:
         weights.set_size(input_size * output_size);
         bias.set_size(output_size);
 
-        weights.set_random(0.1f);
-        bias.set_random(0.1f);
+        weights.set_random(0.2f);
+        bias.set_random(0.2f);
 
         output.set_size(output_size * batch_size);
     }
 
     void forward()
     {
+        //printf("input_size=%zu output_size=%zu batch_size=%zu\n", input_size, output_size, batch_size);
+        //printf("previous_layer ptr = %p\n", previous_layer);
+        //printf("previous_layer->data = %p\n", previous_layer ? previous_layer->data : nullptr);
         int threads = 256;
         int blocks_num = (output_size + threads - 1) / threads;
         dim3 blocks(blocks_num, batch_size);
 
         layer_forward << < blocks, threads >> > (weights.data, bias.data, previous_layer->data, output.data, input_size, output_size, batch_size);
+        
+        cudaError_t err = cudaGetLastError();
+        //std::cout << "Kernel: " << cudaGetErrorString(err) << std::endl;
+
         cudaDeviceSynchronize();
+
+        err = cudaGetLastError();
+        //std::cout << "Sync: " << cudaGetErrorString(err) << std::endl;
 
         if (activation == ActivationType::ReLu)
         {

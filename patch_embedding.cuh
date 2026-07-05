@@ -2,6 +2,7 @@
 #define PATCH_EMBEDDING_CUH
 
 #include "tensor.cuh"
+#include "layer.cuh"
 
 __global__
 void re_shape_image(float* input, float *output,
@@ -37,14 +38,20 @@ void re_shape_image(float* input, float *output,
 class PatchEmbedding
 {
 public:
-	PatchEmbedding(size_t in_total_image_size, size_t in_p_dim, size_t in_batch_size = 1) :
+	PatchEmbedding(size_t in_total_image_size, size_t in_p_dim, size_t output_dim, size_t in_batch_size = 1) :
 		total_image_size(in_total_image_size),
 		patch_dim(in_p_dim), previous(nullptr), output(),
+		linear_dim(output_dim),
 		batch_size(in_batch_size),
-		n_patches(total_image_size / (in_p_dim * in_p_dim))
+		n_patches(total_image_size / (in_p_dim * in_p_dim)),
+		linear(patch_dim* patch_dim,
+			   linear_dim,
+			   batch_size * n_patches,
+			   ActivationType::None)
 	{
 		size_t total_size = (patch_dim * patch_dim) * n_patches * batch_size;
 
+		linear.previous_layer = &output;
 		output.set_size(total_size);
 	}
 
@@ -65,11 +72,13 @@ public:
 												  4,
 												  patch_dim);
 		cudaDeviceSynchronize();
+		linear.forward();
 	}
 
 private:
+	Layer linear;
 	Tensor output, *previous;
-	size_t total_image_size, patch_dim, n_patches, batch_size;
+	size_t total_image_size, patch_dim, n_patches, batch_size, linear_dim;
 };
 
 #endif

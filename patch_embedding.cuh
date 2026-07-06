@@ -38,6 +38,10 @@ void re_shape_image(float* input, float *output,
 class PatchEmbedding
 {
 public:
+	Layer linear;
+	Tensor output, * previous;
+	size_t total_image_size, patch_dim, n_patches, batch_size, linear_dim;
+
 	PatchEmbedding(size_t in_total_image_size, size_t in_p_dim, size_t output_dim, size_t in_batch_size = 1) :
 		total_image_size(in_total_image_size),
 		patch_dim(in_p_dim), previous(nullptr), output(),
@@ -74,11 +78,6 @@ public:
 		cudaDeviceSynchronize();
 		linear.forward();
 	}
-
-private:
-	Layer linear;
-	Tensor output, *previous;
-	size_t total_image_size, patch_dim, n_patches, batch_size, linear_dim;
 };
 
 #endif

@@ -23,6 +23,12 @@ public:
 
 	}
 
+	void forward(Tensor* in_data)
+	{
+		patch.forward(in_data);
+		CLS.forward();
+		positional.forward();
+	}
 
 private:
 	PatchEmbedding patch;

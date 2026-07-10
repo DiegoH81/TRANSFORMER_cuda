@@ -37,6 +37,12 @@ public:
 		classification_head.previous = current_input;
 	}
 
+	~Transformer()
+	{
+		for (auto* block : encoder_blocks)
+			delete block;
+	}
+
 	void forward(Tensor* in_data)
 	{
 		patch.forward(in_data);

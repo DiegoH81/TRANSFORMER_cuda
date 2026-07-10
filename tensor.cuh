@@ -41,7 +41,7 @@ public:
     }
 
     Tensor(const std::vector<float>& in_data) :
-        size(in_data.size())
+        size(in_data.size()), data(nullptr), gradient(nullptr)
     {
         load(in_data);
     }

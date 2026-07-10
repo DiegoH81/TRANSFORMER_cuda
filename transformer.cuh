@@ -12,6 +12,7 @@
 class Transformer
 {
 public:
+	size_t n_batches;
 	Transformer(size_t in_batch, size_t num_encoders_blocks) :
 		n_batches(in_batch),
 		patch(28 * 28, 7, 64, n_batches),
@@ -43,7 +44,7 @@ public:
 			delete block;
 	}
 
-	void forward(Tensor* in_data)
+	Tensor forward(Tensor* in_data)
 	{
 		patch.forward(in_data);
 		CLS.forward();
@@ -52,8 +53,9 @@ public:
 		for (auto& encoder : encoder_blocks)
 			encoder->forward();
 		classification_head.forward();
-	}
 
+		return classification_head.classification_layer.output;
+	}
 private:
 	PatchEmbedding patch;
 	CLS_token CLS;
@@ -62,7 +64,6 @@ private:
 	
 	std::vector<EncoderBlock*> encoder_blocks;
 
-	size_t n_batches;
 };
 
 #endif

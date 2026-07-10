@@ -24,8 +24,10 @@ void extract_CLS(float* encoder_input, float* CLS_output,
 class Classification
 {
 public:
-	Tensor* previous;
 	size_t batch_size, n_patches, linear_dim;
+	Tensor* previous;
+	Layer classification_layer;
+
 
 	Classification(size_t in_n_patches, size_t in_linear_dim, Tensor* in_previous, size_t in_batch_size = 1):
 		n_patches(in_n_patches), linear_dim(in_linear_dim), previous(in_previous), batch_size(in_batch_size),
@@ -48,7 +50,6 @@ public:
 
 private:
 	Tensor CLS_data;
-	Layer classification_layer;
 };
 
 

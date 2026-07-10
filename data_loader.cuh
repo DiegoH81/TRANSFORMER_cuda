@@ -19,6 +19,7 @@ void normalize(uint8_t* images, int n_samples, int img_size)
 
     for (int p = 0; p < img_size; p++)
         images[sample * img_size + p] = images[sample * img_size + p] > 120 ? 1 : 0;
+        //images[sample * img_size + p] /= 255.0;
 }
 
 class Data

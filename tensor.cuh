@@ -108,6 +108,11 @@ public:
         reset_array(gradient);
     }
 
+    void reset_data()
+    {
+        reset_array(data);
+    }
+
     std::vector<float> get_data_CPU()
     {
         std::vector<float> to_return(size);
@@ -134,7 +139,6 @@ private:
 
     void reset_array(float* in_array)
     {
-        //if (in_array)
         cudaMemset(in_array, 0, size * sizeof(float));
     }
 };

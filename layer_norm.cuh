@@ -67,8 +67,8 @@ void add_layer_norm(float* input, float* output,
 class LayerNorm
 {
 public:
-	Tensor output, *previous;
 	size_t batch_size, n_patches, linear_dim;
+	Tensor output, *previous;
 
 	LayerNorm(size_t in_n_patches, size_t in_linear_dim, Tensor* in_previous, size_t in_batch_size = 1) :
 		batch_size(in_batch_size), n_patches(in_n_patches), linear_dim(in_linear_dim),

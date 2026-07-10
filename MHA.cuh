@@ -123,9 +123,9 @@ void multiply_value(float* score_matrix,
 class MHA
 {
 public:
+	size_t batch_size, n_patches, linear_dim, num_heads, head_dim;
 	Tensor *previous;
 	Layer W_out;
-	size_t batch_size, n_patches, linear_dim, num_heads, head_dim;
 	
 
 	MHA(size_t in_n_patches, size_t in_linear_dim, Tensor* in_previous, size_t in_batch_size = 1) :

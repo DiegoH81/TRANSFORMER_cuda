@@ -123,7 +123,8 @@ void multiply_value(float* score_matrix,
 class MHA
 {
 public:
-	Tensor output, *previous;
+	Tensor *previous;
+	Layer W_out;
 	size_t batch_size, n_patches, linear_dim, num_heads, head_dim;
 	
 
@@ -133,12 +134,13 @@ public:
 		num_heads(8), head_dim(linear_dim / num_heads),
 		W_query(linear_dim, linear_dim, batch_size * n_patches, ActivationType::None, previous),
 		W_key(linear_dim, linear_dim, batch_size* n_patches, ActivationType::None, previous),
-		W_value(linear_dim, linear_dim, batch_size * n_patches, ActivationType::None, previous)
+		W_value(linear_dim, linear_dim, batch_size * n_patches, ActivationType::None, previous),
+		W_out(linear_dim, linear_dim, batch_size* n_patches, ActivationType::None, &attention_output)
 	{
 		score_matrix.set_size(batch_size * num_heads * n_patches * n_patches);
 		acumulator_exp.set_size(batch_size * num_heads * n_patches);
 
-		output.set_size(batch_size * (n_patches * linear_dim)); // One output mat per Data
+		attention_output.set_size(batch_size * (n_patches * linear_dim)); // One output mat per Data
 	}
 
 	void forward()
@@ -175,15 +177,16 @@ public:
 
 		blocks = dim3(blocks_num, batch_size);
 		multiply_value << < blocks, threads >> > (score_matrix.data, W_value.output.data,
-												  output.data, num_heads, head_dim, batch_size,
+												  attention_output.data, num_heads, head_dim, batch_size,
 												  linear_dim, n_patches);
 		cudaDeviceSynchronize();
 
+		W_out.forward();
 	}
 	
 private:
+	Tensor score_matrix, acumulator_exp, attention_output;
 	Layer W_query, W_key, W_value;
-	Tensor score_matrix, acumulator_exp;
 
 };
 

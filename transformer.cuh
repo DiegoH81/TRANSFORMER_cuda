@@ -1,15 +1,17 @@
 #ifndef TRANSFORMER_CUH
 #define TRANSFORMER_CUH
 
+#include <vector>
+
 #include "patch_embedding.cuh"
 #include "CLS_token.cuh"
 #include "positional_encoding.cuh"
-#include "layer_norm.cuh"
+#include "encoder_block.cuh"
 
 class Transformer
 {
 public:
-	Transformer(size_t in_batch) :
+	Transformer(size_t in_batch, size_t num_encoders_blocks) :
 		n_batches(in_batch),
 		patch(28 * 28, 7, 64, n_batches),
 		CLS(patch.n_patches,
@@ -19,12 +21,16 @@ public:
 		positional(CLS.n_patches + 1,
 			CLS.patch_dim,
 			&CLS.output,
-			n_batches),
-		layer_norm(positional.n_patches,
-			positional.patch_dim, &positional.output,
 			n_batches)
 	{
+		Tensor* current_input = &positional.output;
+		for (int i = 0; i < num_encoders_blocks; i++)
+		{
+			EncoderBlock* to_push = new EncoderBlock(positional.n_patches, positional.patch_dim, current_input, n_batches);
+			encoder_blocks.push_back(to_push);
 
+			current_input = &to_push->output;
+		}
 	}
 
 	void forward(Tensor* in_data)
@@ -32,14 +38,14 @@ public:
 		patch.forward(in_data);
 		CLS.forward();
 		positional.forward();
-		layer_norm.forward();
 	}
 
 private:
 	PatchEmbedding patch;
 	CLS_token CLS;
 	PositionalEncoding positional;
-	LayerNorm layer_norm;
+	
+	std::vector<EncoderBlock*> encoder_blocks;
 
 	size_t n_batches;
 };

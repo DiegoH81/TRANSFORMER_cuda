@@ -91,11 +91,41 @@ void div_matrix(float* score_matrix,
 	score_matrix[mat_idx] /= acumulator[acumulator_idx];
 }
 
+__global__
+void multiply_value(float* score_matrix,
+					float* value_vector,
+					float* output,
+					size_t n_heads,
+					size_t head_dim,
+					size_t batch_size, size_t linear_dim, size_t n_patches)
+{
+	int matrix_idx = (blockDim.x * blockIdx.x) + threadIdx.x;
+	int batch_idx = blockIdx.y;
+
+	if ((matrix_idx >= n_patches * linear_dim) || (batch_idx >= batch_size))
+		return;
+
+
+	int row_idx = matrix_idx / linear_dim;
+	int col_idx = matrix_idx % linear_dim;
+
+	int head_idx = col_idx / head_dim; // Which matrix to go in score matrix
+
+	int value_idx = (batch_idx * n_patches * linear_dim) + (head_idx * head_dim) + (col_idx % head_dim);
+	int score_matrix_idx = (batch_idx * n_heads * n_patches * n_patches) + (head_idx * n_patches * n_patches) + (row_idx * n_patches);
+	int output_idx = (batch_idx * n_patches * linear_dim) + (row_idx * linear_dim) + col_idx;
+
+	output[output_idx] = 0.0f;
+	for (int i = 0; i < n_patches; i++)
+		output[output_idx] += score_matrix[score_matrix_idx + i] * value_vector[value_idx + (i * linear_dim)];	
+}
+
 class MHA
 {
 public:
-	Tensor * previous;
+	Tensor output, *previous;
 	size_t batch_size, n_patches, linear_dim, num_heads, head_dim;
+	
 
 	MHA(size_t in_n_patches, size_t in_linear_dim, Tensor* in_previous, size_t in_batch_size = 1) :
 		batch_size(in_batch_size), n_patches(in_n_patches), linear_dim(in_linear_dim),
@@ -107,6 +137,8 @@ public:
 	{
 		score_matrix.set_size(batch_size * num_heads * n_patches * n_patches);
 		acumulator_exp.set_size(batch_size * num_heads * n_patches);
+
+		output.set_size(batch_size * (n_patches * linear_dim)); // One output mat per Data
 	}
 
 	void forward()
@@ -128,6 +160,7 @@ public:
 													 head_dim, batch_size, linear_dim, n_patches);
 		cudaDeviceSynchronize();
 
+		// Softmax PART
 		exp_matrix << < blocks, threads >> > (score_matrix.data, acumulator_exp.data,
 											  num_heads, head_dim, batch_size, linear_dim, n_patches);
 		cudaDeviceSynchronize();
@@ -135,6 +168,17 @@ public:
 		div_matrix << < blocks, threads >> > (score_matrix.data, acumulator_exp.data,
 											  num_heads, head_dim, batch_size, linear_dim, n_patches);
 		cudaDeviceSynchronize();
+
+		// Final mul
+		threads = 256;
+		blocks_num = ((linear_dim * n_patches) + threads - 1) / threads;
+
+		blocks = dim3(blocks_num, batch_size);
+		multiply_value << < blocks, threads >> > (score_matrix.data, W_value.output.data,
+												  output.data, num_heads, head_dim, batch_size,
+												  linear_dim, n_patches);
+		cudaDeviceSynchronize();
+
 	}
 	
 private:

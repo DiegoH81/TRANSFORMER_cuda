@@ -7,6 +7,7 @@
 #include "CLS_token.cuh"
 #include "positional_encoding.cuh"
 #include "encoder_block.cuh"
+#include "classification.cuh"
 
 class Transformer
 {
@@ -21,7 +22,8 @@ public:
 		positional(CLS.n_patches + 1,
 			CLS.patch_dim,
 			&CLS.output,
-			n_batches)
+			n_batches),
+		classification_head(positional.n_patches, positional. patch_dim, nullptr, n_batches)
 	{
 		Tensor* current_input = &positional.output;
 		for (int i = 0; i < num_encoders_blocks; i++)
@@ -31,6 +33,8 @@ public:
 
 			current_input = &to_push->output;
 		}
+		
+		classification_head.previous = current_input;
 	}
 
 	void forward(Tensor* in_data)
@@ -38,12 +42,17 @@ public:
 		patch.forward(in_data);
 		CLS.forward();
 		positional.forward();
+
+		for (auto& encoder : encoder_blocks)
+			encoder->forward();
+		classification_head.forward();
 	}
 
 private:
 	PatchEmbedding patch;
 	CLS_token CLS;
 	PositionalEncoding positional;
+	Classification classification_head;
 	
 	std::vector<EncoderBlock*> encoder_blocks;
 

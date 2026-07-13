@@ -13,8 +13,10 @@ class Transformer
 {
 public:
 	size_t n_batches;
-	Transformer(size_t in_batch, size_t num_encoders_blocks) :
+	float learning_rate;
+	Transformer(size_t in_batch, size_t num_encoders_blocks, float in_lr = 0.1f) :
 		n_batches(in_batch),
+		learning_rate(in_lr),
 		patch(28 * 28, 7, 64, n_batches),
 		CLS(patch.n_patches,
 			patch.linear_dim,
@@ -55,6 +57,19 @@ public:
 		classification_head.forward();
 
 		return classification_head.classification_layer.output;
+	}
+
+	void zero_grad()
+	{
+		classification_head.zero_grad();
+
+		for (auto& encoder : encoder_blocks)
+			encoder->zero_grad();
+	}
+
+	void update_weights(Tensor& expected)
+	{
+		classification_head.backward(expected, learning_rate);
 	}
 private:
 	PatchEmbedding patch;

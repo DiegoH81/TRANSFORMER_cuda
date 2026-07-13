@@ -37,8 +37,8 @@ void add_residual_backward(float* original_grad, float* attention_grad,
 
 	int start_idx = batch_idx * (linear_dim * n_patches);
 
-	original_grad[start_idx + idx] = residual_grad[start_idx + idx];
-	attention_grad[start_idx + idx] = residual_grad[start_idx + idx];
+	original_grad[start_idx + idx] += residual_grad[start_idx + idx];
+	attention_grad[start_idx + idx] += residual_grad[start_idx + idx];
 }
 
 class EncoderBlock
@@ -89,6 +89,7 @@ public:
 
 		dim3 blocks(blocks_num, batch_size);
 
+		// Residual 2
 		add_residual_backward << < blocks, threads >> > (residual_output.gradient, down_proj.output.gradient, output.gradient, batch_size, linear_dim, n_patches);
 		cudaDeviceSynchronize();
 
@@ -101,7 +102,11 @@ public:
 		up_proj.update_weights(in_learning_rate);
 		up_proj.compute_error_intermediate();
 
-		layer_post_residual.backward();
+		layer_post_residual.backward(in_learning_rate);
+
+		// Residual 1
+		add_residual_backward << < blocks, threads >> > (previous->gradient, mha_part.W_out.output.gradient, residual_output.gradient, batch_size, linear_dim, n_patches);
+		cudaDeviceSynchronize();
 	}
 
 	void zero_grad()

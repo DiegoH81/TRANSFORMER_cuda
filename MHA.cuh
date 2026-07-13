@@ -184,9 +184,11 @@ public:
 		W_out.forward();
 	}
 
-	void backward()
+	void backward(float in_learning_rate)
 	{
-
+		W_out.compute_error_intermediate();
+		W_out.apply_derivative();
+		W_out.update_weights(in_learning_rate);
 	}
 	
 private:

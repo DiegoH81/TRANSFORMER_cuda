@@ -81,6 +81,12 @@ public:
 		cudaDeviceSynchronize();
 	}
 
+	void zero_grad()
+	{
+		classification_layer.zero_grad();
+		CLS_data.zero_grad();
+	}
+
 private:
 	Tensor CLS_data;
 };

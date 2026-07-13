@@ -62,6 +62,9 @@ public:
 	void zero_grad()
 	{
 		classification_head.zero_grad();
+
+		for (auto& encoder : encoder_blocks)
+			encoder->zero_grad();
 	}
 
 	void update_weights(Tensor& expected)

@@ -69,8 +69,9 @@ public:
 	void backward(Tensor& in_expected, float in_learning_rate)
 	{
 		classification_layer.compute_error_last(in_expected);
-		classification_layer.compute_error_intermediate();
+		classification_layer.apply_derivative();
 		classification_layer.update_weights(in_learning_rate);
+		classification_layer.compute_error_intermediate();
 
 
 		int threads = 256;

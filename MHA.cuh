@@ -124,7 +124,7 @@ class MHA
 {
 public:
 	size_t batch_size, n_patches, linear_dim, num_heads, head_dim;
-	Tensor *previous;
+	Tensor score_matrix, acumulator_exp, attention_output, *previous;
 	Layer W_out;
 	
 
@@ -183,11 +183,14 @@ public:
 
 		W_out.forward();
 	}
+
+	void backward()
+	{
+
+	}
 	
 private:
-	Tensor score_matrix, acumulator_exp, attention_output;
 	Layer W_query, W_key, W_value;
-
 };
 
 #endif

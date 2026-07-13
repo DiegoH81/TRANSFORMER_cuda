@@ -22,6 +22,25 @@ void add_residual(float* original_input, float* attention_input,
 	output[start_idx + idx] = original_input[start_idx + idx] + attention_input[start_idx + idx];
 }
 
+__global__
+void add_residual_backward(float* original_grad, float* attention_grad,
+						   float* residual_grad,
+						   size_t batch_size,
+						   size_t linear_dim,
+						   size_t n_patches)
+{
+	int idx = (blockDim.x * blockIdx.x) + threadIdx.x;
+	int batch_idx = blockIdx.y;
+
+	if ((idx >= linear_dim * n_patches) || (batch_idx >= batch_size))
+		return;
+
+	int start_idx = batch_idx * (linear_dim * n_patches);
+
+	original_grad[start_idx + idx] = residual_grad[start_idx + idx];
+	attention_grad[start_idx + idx] = residual_grad[start_idx + idx];
+}
+
 class EncoderBlock
 {
 public:
@@ -61,6 +80,35 @@ public:
 
 		add_residual << < blocks, threads >> > (residual_output.data, down_proj.output.data, output.data, batch_size, linear_dim, n_patches);
 		cudaDeviceSynchronize();
+	}
+
+	void backward(float in_learning_rate)
+	{
+		int threads = 256;
+		int blocks_num = ((linear_dim * n_patches) + threads - 1) / threads;
+
+		dim3 blocks(blocks_num, batch_size);
+
+		add_residual_backward << < blocks, threads >> > (residual_output.gradient, down_proj.output.gradient, output.gradient, batch_size, linear_dim, n_patches);
+		cudaDeviceSynchronize();
+
+		// Layers
+		down_proj.apply_derivative();
+		down_proj.update_weights(in_learning_rate);
+		down_proj.compute_error_intermediate();
+
+		up_proj.apply_derivative();
+		up_proj.update_weights(in_learning_rate);
+		up_proj.compute_error_intermediate();
+
+		layer_post_residual.backward();
+	}
+
+	void zero_grad()
+	{
+		up_proj.zero_grad();
+		down_proj.zero_grad();
+		layer_post_residual.zero_grad();
 	}
 
 private:

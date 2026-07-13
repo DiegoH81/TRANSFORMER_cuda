@@ -56,6 +56,11 @@ public:
 
 		return classification_head.classification_layer.output;
 	}
+
+	void update_weights(Tensor& expected)
+	{
+
+	}
 private:
 	PatchEmbedding patch;
 	CLS_token CLS;

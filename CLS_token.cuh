@@ -27,6 +27,40 @@ void add_cls(float* input, float* output,
 	}
 }
 
+__global__
+void add_cls_backward(float* input_grad, float* output_grad,
+					  float* CLS_data_grad,
+					  size_t batch_size,
+					  size_t patch_size,
+					  size_t n_patches)
+{
+	int idx = (blockDim.x * blockIdx.x) + threadIdx.x;
+	int batch_idx = blockIdx.y;
+
+	int total_size = patch_size * n_patches;
+	if (idx >= total_size || batch_idx >= batch_size)
+		return;
+
+	int initial_idx = batch_idx * (total_size + patch_size);
+	input_grad[(batch_idx * total_size) + idx] = output_grad[initial_idx + patch_size + idx];
+
+	if (idx == 0)
+	{
+		for (int i = 0; i < patch_size; i++)
+			atomicAdd(&CLS_data_grad[i], output_grad[initial_idx + i]);
+	}
+}
+
+__global__
+void update_weights_CLS(float* CLS_data, float* CLS_grad, float learning_rate, size_t patch_dim, size_t batch_size)
+{
+	int idx = (blockDim.x * blockIdx.x) + threadIdx.x;
+	if (idx >= patch_dim)
+		return;
+
+	CLS_data[idx] -= learning_rate * (CLS_grad[idx] / float(batch_size));
+}
+
 class CLS_token
 {
 public:
@@ -55,6 +89,28 @@ public:
 										   CLS_parameters.data,
 										   batch_size, patch_dim, n_patches);
 		cudaDeviceSynchronize();
+	}
+
+	void backward(float in_learning_rate)
+	{
+		int threads = 256;
+		int blocks_num = ((patch_dim * n_patches) + threads - 1) / threads;
+
+		dim3 blocks(blocks_num, batch_size);
+
+		add_cls_backward <<< blocks, threads >>> (previous->gradient, output.gradient, CLS_parameters.gradient, 
+												  batch_size, patch_dim, n_patches);
+		cudaDeviceSynchronize();
+
+		blocks_num = (patch_dim + threads - 1) / threads;
+		update_weights_CLS <<< blocks_num, threads >>> (CLS_parameters.data, CLS_parameters.gradient, in_learning_rate,
+														patch_dim, batch_size);
+		cudaDeviceSynchronize();
+	}
+
+	void zero_grad()
+	{
+		CLS_parameters.zero_grad();
 	}
 private:
 	Tensor CLS_parameters;

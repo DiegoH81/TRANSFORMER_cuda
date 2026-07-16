@@ -96,6 +96,11 @@ public:
 														  n_patches, patch_dim);
 		cudaDeviceSynchronize();
 	}
+
+	void zero_grad()
+	{
+		position_parameters.zero_grad();
+	}
 private:
 	Tensor position_parameters;
 };

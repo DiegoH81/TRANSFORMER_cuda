@@ -68,6 +68,7 @@ public:
 
 		positional.zero_grad();
 		CLS.zero_grad();
+		patch.zero_grad();
 	}
 
 	void update_weights(Tensor& expected)
@@ -79,6 +80,7 @@ public:
 
 		positional.backward(learning_rate);
 		CLS.backward(learning_rate);
+		patch.backward(learning_rate);
 	}
 private:
 	PatchEmbedding patch;

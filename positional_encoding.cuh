@@ -21,6 +21,37 @@ void add_position(float* input, float* output,
 	output[start_idx + idx] = input[start_idx + idx] + POSITION_data[idx];
 }
 
+__global__
+void add_position_backward(float* input_grad, float* output_grad,
+						   float* POSITION_data_grad,
+						   size_t batch_size,
+						   size_t patch_size,
+						   size_t n_patches)
+{
+	int idx = (blockDim.x * blockIdx.x) + threadIdx.x;
+	int batch_idx = blockIdx.y;
+
+	if ((idx >= patch_size * n_patches) || (batch_idx >= batch_size))
+		return;
+
+	int start_idx = batch_idx * (patch_size * n_patches);
+
+	input_grad[start_idx + idx] = output_grad[start_idx + idx];
+	atomicAdd(&POSITION_data_grad[idx], output_grad[start_idx + idx]);
+}
+
+__global__
+void update_weights_pos(float* pos_data, float* pos_grad, float learning_rate,
+					size_t n_patches, size_t linear_dim)
+{
+	int idx = (blockDim.x * blockIdx.x) + threadIdx.x;
+	if (idx >= n_patches * linear_dim)
+		return;
+
+	pos_data[idx] -= learning_rate * pos_grad[idx];
+
+}
+
 class PositionalEncoding
 {
 public:
@@ -46,6 +77,23 @@ public:
 		add_position << < blocks, threads >> > (previous->data, output.data, position_parameters.data,
 												batch_size, patch_dim, n_patches);
 
+		cudaDeviceSynchronize();
+	}
+
+	void backward(float in_learning_rate)
+	{
+		int threads = 256;
+		int blocks_num = ((patch_dim * n_patches) + threads - 1) / threads;
+
+		dim3 blocks(blocks_num, batch_size);
+		add_position_backward <<< blocks, threads>>> (previous->gradient, output.gradient, 
+													  position_parameters.gradient,
+													  batch_size, patch_dim, n_patches);
+		cudaDeviceSynchronize();
+
+		update_weights_pos << < blocks_num, threads >> > (position_parameters.data,
+														  position_parameters.gradient, in_learning_rate,
+														  n_patches, patch_dim);
 		cudaDeviceSynchronize();
 	}
 private:

@@ -94,13 +94,13 @@ public:
 		cudaDeviceSynchronize();
 
 		// Layers
+		down_proj.compute_error_intermediate();
 		down_proj.apply_derivative();
 		down_proj.update_weights(in_learning_rate);
-		down_proj.compute_error_intermediate();
 
+		up_proj.compute_error_intermediate();
 		up_proj.apply_derivative();
 		up_proj.update_weights(in_learning_rate);
-		up_proj.compute_error_intermediate();
 
 		layer_post_residual.backward(in_learning_rate);
 

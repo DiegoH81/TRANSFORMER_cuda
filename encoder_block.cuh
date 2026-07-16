@@ -107,12 +107,17 @@ public:
 		// Residual 1
 		add_residual_backward << < blocks, threads >> > (previous->gradient, mha_part.W_out.output.gradient, residual_output.gradient, batch_size, linear_dim, n_patches);
 		cudaDeviceSynchronize();
+
+		mha_part.backward(in_learning_rate);
+		layer_norm_part.backward(in_learning_rate);
 	}
 
 	void zero_grad()
 	{
 		up_proj.zero_grad();
 		down_proj.zero_grad();
+		layer_post_residual.zero_grad();
+		mha_part.zero_grad();
 		layer_post_residual.zero_grad();
 	}
 

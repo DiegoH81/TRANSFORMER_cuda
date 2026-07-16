@@ -65,11 +65,22 @@ public:
 
 		for (auto& encoder : encoder_blocks)
 			encoder->zero_grad();
+
+		positional.zero_grad();
+		CLS.zero_grad();
+		patch.zero_grad();
 	}
 
 	void update_weights(Tensor& expected)
 	{
 		classification_head.backward(expected, learning_rate);
+
+		for (auto rev_it = encoder_blocks.rbegin(); rev_it != encoder_blocks.rend(); rev_it++)
+			(*rev_it)->backward(learning_rate);
+
+		positional.backward(learning_rate);
+		CLS.backward(learning_rate);
+		patch.backward(learning_rate);
 	}
 private:
 	PatchEmbedding patch;

@@ -78,6 +78,18 @@ public:
 		cudaDeviceSynchronize();
 		linear.forward();
 	}
+
+	void backward(float in_learning_rate)
+	{
+		//linear.compute_error_intermediate();
+		linear.apply_derivative();
+		linear.update_weights(in_learning_rate);
+	}
+
+	void zero_grad()
+	{
+		linear.zero_grad();
+	}
 };
 
 #endif

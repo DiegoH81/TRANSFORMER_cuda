@@ -33,5 +33,9 @@ int main()
         std::cout << ans_CPU[i] << " ";
     std::cout << "\n";
 
+    testin.update_weights(expected_total);
+    testin.zero_grad();
+
+    std::cout << "End\n";
     return 0;
 }

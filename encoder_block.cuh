@@ -94,13 +94,13 @@ public:
 		cudaDeviceSynchronize();
 
 		// Layers
-		down_proj.compute_error_intermediate();
 		down_proj.apply_derivative();
 		down_proj.update_weights(in_learning_rate);
+		down_proj.compute_error_intermediate();
 
-		up_proj.compute_error_intermediate();
 		up_proj.apply_derivative();
 		up_proj.update_weights(in_learning_rate);
+		up_proj.compute_error_intermediate();
 
 		layer_post_residual.backward(in_learning_rate);
 
@@ -110,6 +110,8 @@ public:
 
 		mha_part.backward(in_learning_rate);
 		layer_norm_part.backward(in_learning_rate);
+
+		// Add residual?
 	}
 
 	void zero_grad()
@@ -118,10 +120,30 @@ public:
 		down_proj.zero_grad();
 		layer_post_residual.zero_grad();
 		mha_part.zero_grad();
-		layer_post_residual.zero_grad();
+		layer_norm_part.zero_grad();
+		output.zero_grad();
+		residual_output.zero_grad();
+
 	}
 
-private:
+	void save_weights(std::ofstream& file)
+	{
+		layer_norm_part.save_weights(file);
+		mha_part.save_weights(file);
+		layer_post_residual.save_weights(file);
+		up_proj.save_weights(file);
+		down_proj.save_weights(file);
+	}
+
+	void load_weights(std::ifstream& file)
+	{
+		layer_norm_part.load_weights(file);
+		mha_part.load_weights(file);
+		layer_post_residual.load_weights(file);
+		up_proj.load_weights(file);
+		down_proj.load_weights(file);
+	}
+
 	Tensor residual_output;
 	LayerNorm layer_norm_part, layer_post_residual;
 	Layer up_proj, down_proj;

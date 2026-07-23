@@ -6,6 +6,7 @@
 
 #include "tensor.cuh"
 #include "activation_function.cuh"
+#include "utils.cuh"
 
 __global__
 void layer_forward(float* weights, float* bias, float* input, float* output,
@@ -94,7 +95,10 @@ void update_weights_krnl(float* weights, float* input_data,
     
     for (size_t i = 0; i < input_size; i++)
     {
-        float sum = learning_rate * input_data[(batch_idx * input_size) + i] * output_gradients[(batch_idx * output_size) + weight_idx];
+        float grad = output_gradients[(batch_idx * output_size) + weight_idx];
+        grad = clip_grad(grad);
+        float sum = learning_rate * input_data[(batch_idx * input_size) + i] * grad;
+
         atomicAdd(&weights[weight_idx * input_size + i], sum / (float)batch_size);
     }
 }
@@ -109,7 +113,9 @@ void update_bias_krnl(float* bias_data, float* output_gradients, float learning_
     if (bias_idx >= output_size || batch_idx >= batch_size)
         return;
 
-    float sum = learning_rate * output_gradients[(batch_idx * output_size) + bias_idx]; //* bias_data[batch_idx] 
+    float grad = output_gradients[(batch_idx * output_size) + bias_idx];
+    grad = clip_grad(grad);
+    float sum = learning_rate * grad;
 
     atomicAdd(&bias_data[bias_idx], sum / (float)batch_size);
 }
@@ -196,13 +202,32 @@ public:
 
         update_bias_krnl << < blocks, threads >> > (bias.data, output.gradient, learning_rate, output_size, batch_size);
         cudaDeviceSynchronize();
+
+        int w_total = input_size * output_size;
+        int w_blocks = (w_total + threads - 1) / threads;
+        clamp_weights_krnl << < w_blocks, threads >> > (weights.data, w_total);
+        cudaDeviceSynchronize();
+
+        int b_blocks = (output_size + threads - 1) / threads;
+        clamp_weights_krnl << < b_blocks, threads >> > (bias.data, output_size);
+        cudaDeviceSynchronize();
     }
 
     void zero_grad()
     {
         output.zero_grad();
-        if (previous_layer)
-            previous_layer->zero_grad();
+    }
+
+    void save_weights(std::ofstream& file)
+    {
+        write_tensor(file, weights);
+        write_tensor(file, bias);
+    }
+
+    void load_weights(std::ifstream& file)
+    {
+        read_tensor(file, weights);
+        read_tensor(file, bias);
     }
 };
 

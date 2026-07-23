@@ -81,14 +81,25 @@ public:
 
 	void backward(float in_learning_rate)
 	{
-		//linear.compute_error_intermediate();
 		linear.apply_derivative();
 		linear.update_weights(in_learning_rate);
+		//linear.compute_error_intermediate();
 	}
 
 	void zero_grad()
 	{
 		linear.zero_grad();
+		output.zero_grad();
+	}
+
+	void save_weights(std::ofstream& file)
+	{
+		linear.save_weights(file);
+	}
+
+	void load_weights(std::ifstream& file)
+	{
+		linear.load_weights(file);
 	}
 };
 

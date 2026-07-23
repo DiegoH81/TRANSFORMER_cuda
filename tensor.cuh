@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <random>
+#include <fstream>
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
@@ -142,5 +143,22 @@ private:
         cudaMemset(in_array, 0, size * sizeof(float));
     }
 };
+
+inline void write_tensor(std::ofstream& file, Tensor& t)
+{
+    auto data = t.get_data_CPU();
+    for (float v : data)
+        file << v << " ";
+    file << "\n";
+}
+
+inline void read_tensor(std::ifstream& file, Tensor& t)
+{
+    std::vector<float> data(t.size);
+    for (size_t i = 0; i < t.size; i++)
+        file >> data[i];
+
+    t.load(data);
+}
 
 #endif

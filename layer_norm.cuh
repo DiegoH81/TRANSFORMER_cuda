@@ -149,13 +149,13 @@ void add_layer_norm(float* input, float* output,
 
 __global__
 void update_weights(float* input_data, float* input_gradient, float learning_rate,
-						 size_t linear_dim)
+						 size_t linear_dim, size_t batch_size, size_t n_patches)
 {
 	int idx = (blockDim.x * blockIdx.x) + threadIdx.x;
 	if (idx >= linear_dim)
 		return;
 
-	input_data[idx] -= learning_rate * input_gradient[idx];
+	input_data[idx] += (learning_rate * clip_grad(input_gradient[idx])) / float(n_patches);
 
 }
 class LayerNorm
@@ -209,6 +209,8 @@ public:
 		sum_dxhat.reset_data();
 		sum_dxhat_xhat.reset_data();
 
+		float effective_lr = in_learning_rate / (float)(batch_size * linear_dim);
+
 		int threads = 256;
 		int blocks_num = ((linear_dim * n_patches) + threads - 1) / threads;
 
@@ -232,10 +234,10 @@ public:
 
 		// Updating weights
 		blocks_num = (linear_dim + threads - 1) / threads;
-		update_weights << < blocks_num, threads >> > (beta.data, beta.gradient, in_learning_rate, linear_dim);
+		update_weights << < blocks_num, threads >> > (beta.data, beta.gradient, effective_lr, linear_dim, batch_size, n_patches);
 		cudaDeviceSynchronize();
 
-		update_weights << < blocks_num, threads >> > (gamma.data, gamma.gradient, in_learning_rate, linear_dim);
+		update_weights << < blocks_num, threads >> > (gamma.data, gamma.gradient, effective_lr, linear_dim, batch_size, n_patches);
 		cudaDeviceSynchronize();
 	}
 
@@ -243,6 +245,19 @@ public:
 	{
 		beta.zero_grad();
 		gamma.zero_grad();
+		output.zero_grad();
+	}
+
+	void save_weights(std::ofstream& file)
+	{
+		write_tensor(file, gamma);
+		write_tensor(file, beta);
+	}
+
+	void load_weights(std::ifstream& file)
+	{
+		read_tensor(file, gamma);
+		read_tensor(file, beta);
 	}
 
 private:

@@ -39,6 +39,30 @@ void extract_CLS_backward(float* CLS_grad, float* encoder_grad,
 	encoder_grad[encoder_idx + idx] = CLS_grad[batch_idx * linear_dim + idx];
 }
 
+__global__
+void softmax_forward(float* output, size_t output_size, size_t batch_size)
+{
+	int batch_idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (batch_idx >= batch_size)
+		return;
+
+	float* row = output + batch_idx * output_size;
+
+	float max_val = row[0];
+	for (size_t i = 1; i < output_size; i++)
+		max_val = fmaxf(max_val, row[i]);
+
+	float sum = 0.0f;
+	for (size_t i = 0; i < output_size; i++)
+	{
+		row[i] = expf(row[i] - max_val);
+		sum += row[i];
+	}
+
+	for (size_t i = 0; i < output_size; i++)
+		row[i] /= sum;
+}
+
 class Classification
 {
 public:
@@ -64,6 +88,11 @@ public:
 		cudaDeviceSynchronize();
 
 		classification_layer.forward();
+
+		int sm_threads = 32;
+		int sm_blocks = (batch_size + sm_threads - 1) / sm_threads;
+		softmax_forward << < sm_blocks, sm_threads >> > (classification_layer.output.data, 10, batch_size);
+		cudaDeviceSynchronize();
 	}
 
 	void backward(Tensor& in_expected, float in_learning_rate)
@@ -86,6 +115,16 @@ public:
 	{
 		classification_layer.zero_grad();
 		CLS_data.zero_grad();
+	}
+
+	void save_weights(std::ofstream& file)
+	{
+		classification_layer.save_weights(file);
+	}
+
+	void load_weights(std::ifstream& file)
+	{
+		classification_layer.load_weights(file);
 	}
 
 private:

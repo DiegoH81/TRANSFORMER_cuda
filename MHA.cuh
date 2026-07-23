@@ -69,8 +69,31 @@ void mat_mul_backward(float* query, float* query_grad,
 }
 
 __global__
+void row_max(float* score_matrix, float* max_out,
+	size_t n_heads, size_t head_dim,
+	size_t batch_size, size_t linear_dim, size_t n_patches)
+{
+	int row_idx = blockIdx.x;   // una fila por bloque, simple
+	int batch_idx = blockIdx.y;
+	int head_idx = blockIdx.z;
+
+	if (row_idx >= n_patches || batch_idx >= batch_size || head_idx >= n_heads)
+		return;
+
+	int base = (batch_idx * n_heads * n_patches * n_patches) + (head_idx * n_patches * n_patches) + (row_idx * n_patches);
+
+	float m = -FLT_MAX;
+	for (int c = 0; c < n_patches; c++)
+		m = fmaxf(m, score_matrix[base + c]);
+
+	int acc_idx = (batch_idx * n_heads * n_patches) + (head_idx * n_patches) + row_idx;
+	max_out[acc_idx] = m;
+}
+
+__global__
 void exp_matrix(float* score_matrix,
 				float* acumulator,
+				float* max_vals,
 				size_t n_heads,
 				size_t head_dim,
 				size_t batch_size, size_t linear_dim, size_t n_patches)
@@ -92,9 +115,8 @@ void exp_matrix(float* score_matrix,
 	int acumulator_idx = (batch_idx * n_heads * n_patches) + (head_idx * n_patches) + row_idx;
 
 
+	score_matrix[mat_idx] = exp(score_matrix[mat_idx] - max_vals[acumulator_idx]);
 
-
-	score_matrix[mat_idx] = exp(score_matrix[mat_idx]);
 	atomicAdd(&acumulator[acumulator_idx], score_matrix[mat_idx]);
 }
 
@@ -248,7 +270,7 @@ class MHA
 {
 public:
 	size_t batch_size, n_patches, linear_dim, num_heads, head_dim;
-	Tensor score_matrix, acumulator_exp, attention_output, *previous;
+	Tensor score_matrix, acumulator_exp, row_max_vals, attention_output, *previous;
 	Layer W_out;
 	
 
@@ -263,6 +285,7 @@ public:
 	{
 		score_matrix.set_size(batch_size * num_heads * n_patches * n_patches);
 		acumulator_exp.set_size(batch_size * num_heads * n_patches);
+		row_max_vals.set_size(batch_size * num_heads * n_patches);
 
 		attention_output.set_size(batch_size * (n_patches * linear_dim)); // One output mat per Data
 	}
@@ -287,8 +310,13 @@ public:
 		cudaDeviceSynchronize();
 
 		// Softmax PART
+		dim3 max_blocks(n_patches, batch_size, num_heads);
+		row_max << < max_blocks, 1 >> > (score_matrix.data, row_max_vals.data, 
+										 num_heads, head_dim, batch_size, linear_dim, n_patches);
+		cudaDeviceSynchronize();
+
 		exp_matrix << < blocks, threads >> > (score_matrix.data, acumulator_exp.data,
-											  num_heads, head_dim, batch_size, linear_dim, n_patches);
+											  row_max_vals.data, num_heads, head_dim, batch_size, linear_dim, n_patches);
 		cudaDeviceSynchronize();
 		
 		div_matrix << < blocks, threads >> > (score_matrix.data, acumulator_exp.data,
@@ -310,9 +338,12 @@ public:
 
 	void backward(float in_learning_rate)
 	{
-		W_out.compute_error_intermediate();
+		float effective_lr = in_learning_rate / (float)(batch_size * linear_dim);
+
+
 		W_out.apply_derivative();
-		W_out.update_weights(in_learning_rate);
+		W_out.update_weights(effective_lr);
+		W_out.compute_error_intermediate();
 
 		int threads = 256;
 		int blocks_num = ((linear_dim * n_patches) + threads - 1) / threads;
@@ -338,6 +369,7 @@ public:
 												 acumulator_exp.data,
 												 num_heads, head_dim, batch_size, linear_dim, n_patches);
 		cudaDeviceSynchronize();
+
 		float d_root = std::sqrt(head_dim);
 		mat_mul_backward << < blocks, threads >> > (W_query.output.data, W_query.output.gradient,
 													W_key.output.data, W_key.output.gradient,
@@ -346,17 +378,18 @@ public:
 		cudaDeviceSynchronize();
 
 		// Initial
-		W_key.compute_error_intermediate();
 		W_key.apply_derivative();
-		W_key.update_weights(in_learning_rate);
+		W_key.update_weights(effective_lr);
+		W_key.compute_error_intermediate();
 
-		W_query.compute_error_intermediate();
 		W_query.apply_derivative();
-		W_query.update_weights(in_learning_rate);
+		W_query.update_weights(effective_lr);
+		W_query.compute_error_intermediate();
 
-		W_value.compute_error_intermediate();
+
 		W_value.apply_derivative();
-		W_value.update_weights(in_learning_rate);
+		W_value.update_weights(effective_lr);
+		W_value.compute_error_intermediate();
 	}
 	
 	void zero_grad()
@@ -368,6 +401,22 @@ public:
 		acumulator_exp.reset_data();
 		attention_output.zero_grad();
 		W_out.zero_grad();
+	}
+
+	void save_weights(std::ofstream& file)
+	{
+		W_query.save_weights(file);
+		W_key.save_weights(file);
+		W_value.save_weights(file);
+		W_out.save_weights(file);
+	}
+
+	void load_weights(std::ifstream& file)
+	{
+		W_query.load_weights(file);
+		W_key.load_weights(file);
+		W_value.load_weights(file);
+		W_out.load_weights(file);
 	}
 private:
 	Layer W_query, W_key, W_value;

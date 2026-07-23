@@ -48,7 +48,7 @@ void update_weights_pos(float* pos_data, float* pos_grad, float learning_rate,
 	if (idx >= n_patches * linear_dim)
 		return;
 
-	pos_data[idx] -= learning_rate * pos_grad[idx];
+	pos_data[idx] += learning_rate * clip_grad(pos_grad[idx]);
 
 }
 
@@ -91,8 +91,9 @@ public:
 													  batch_size, patch_dim, n_patches);
 		cudaDeviceSynchronize();
 
+		float effective_lr = in_learning_rate / (float) batch_size;
 		update_weights_pos << < blocks_num, threads >> > (position_parameters.data,
-														  position_parameters.gradient, in_learning_rate,
+														  position_parameters.gradient, effective_lr,
 														  n_patches, patch_dim);
 		cudaDeviceSynchronize();
 	}
@@ -100,6 +101,17 @@ public:
 	void zero_grad()
 	{
 		position_parameters.zero_grad();
+		output.zero_grad();
+	}
+
+	void save_weights(std::ofstream& file)
+	{
+		write_tensor(file, position_parameters);
+	}
+
+	void load_weights(std::ifstream& file)
+	{
+		read_tensor(file, position_parameters);
 	}
 private:
 	Tensor position_parameters;

@@ -2,6 +2,7 @@
 #define CLS_TOKEN
 
 #include "patch_embedding.cuh"
+#include "utils.cuh"
 
 __global__
 void add_cls(float* input, float* output,
@@ -58,7 +59,7 @@ void update_weights_CLS(float* CLS_data, float* CLS_grad, float learning_rate, s
 	if (idx >= patch_dim)
 		return;
 
-	CLS_data[idx] -= learning_rate * (CLS_grad[idx] / float(batch_size));
+	CLS_data[idx] += learning_rate * (clip_grad(CLS_grad[idx]) / float(batch_size));
 }
 
 class CLS_token
@@ -111,6 +112,17 @@ public:
 	void zero_grad()
 	{
 		CLS_parameters.zero_grad();
+		output.zero_grad();
+	}
+
+	void save_weights(std::ofstream& file)
+	{
+		write_tensor(file, CLS_parameters);
+	}
+
+	void load_weights(std::ifstream& file)
+	{
+		read_tensor(file, CLS_parameters);
 	}
 private:
 	Tensor CLS_parameters;
